@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type CalculatorServiceClient interface {
 	Sum(ctx context.Context, in *SumRequest, opts ...grpc.CallOption) (*SumResponse, error)
 	Sqrt(ctx context.Context, in *SqrtRequest, opts ...grpc.CallOption) (*SqrtResponse, error)
+	Prime(ctx context.Context, in *PrimeRequest, opts ...grpc.CallOption) (CalculatorService_PrimeClient, error)
 }
 
 type calculatorServiceClient struct {
@@ -52,12 +53,45 @@ func (c *calculatorServiceClient) Sqrt(ctx context.Context, in *SqrtRequest, opt
 	return out, nil
 }
 
+func (c *calculatorServiceClient) Prime(ctx context.Context, in *PrimeRequest, opts ...grpc.CallOption) (CalculatorService_PrimeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CalculatorService_ServiceDesc.Streams[0], "/calculator.CalculatorService/Prime", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &calculatorServicePrimeClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CalculatorService_PrimeClient interface {
+	Recv() (*PrimeResponse, error)
+	grpc.ClientStream
+}
+
+type calculatorServicePrimeClient struct {
+	grpc.ClientStream
+}
+
+func (x *calculatorServicePrimeClient) Recv() (*PrimeResponse, error) {
+	m := new(PrimeResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // CalculatorServiceServer is the server API for CalculatorService service.
 // All implementations must embed UnimplementedCalculatorServiceServer
 // for forward compatibility
 type CalculatorServiceServer interface {
 	Sum(context.Context, *SumRequest) (*SumResponse, error)
 	Sqrt(context.Context, *SqrtRequest) (*SqrtResponse, error)
+	Prime(*PrimeRequest, CalculatorService_PrimeServer) error
 	mustEmbedUnimplementedCalculatorServiceServer()
 }
 
@@ -70,6 +104,9 @@ func (UnimplementedCalculatorServiceServer) Sum(context.Context, *SumRequest) (*
 }
 func (UnimplementedCalculatorServiceServer) Sqrt(context.Context, *SqrtRequest) (*SqrtResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Sqrt not implemented")
+}
+func (UnimplementedCalculatorServiceServer) Prime(*PrimeRequest, CalculatorService_PrimeServer) error {
+	return status.Errorf(codes.Unimplemented, "method Prime not implemented")
 }
 func (UnimplementedCalculatorServiceServer) mustEmbedUnimplementedCalculatorServiceServer() {}
 
@@ -120,6 +157,27 @@ func _CalculatorService_Sqrt_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CalculatorService_Prime_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(PrimeRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CalculatorServiceServer).Prime(m, &calculatorServicePrimeServer{stream})
+}
+
+type CalculatorService_PrimeServer interface {
+	Send(*PrimeResponse) error
+	grpc.ServerStream
+}
+
+type calculatorServicePrimeServer struct {
+	grpc.ServerStream
+}
+
+func (x *calculatorServicePrimeServer) Send(m *PrimeResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // CalculatorService_ServiceDesc is the grpc.ServiceDesc for CalculatorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -136,6 +194,12 @@ var CalculatorService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _CalculatorService_Sqrt_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Prime",
+			Handler:       _CalculatorService_Prime_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "calculator.proto",
 }
