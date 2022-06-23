@@ -25,5 +25,6 @@ func main() {
 	// doGreetManyTimes(c)
 	// doGreetWithDeadline(c, 5*time.Second)
 	// doGreetWithDeadline(c, 1*time.Second)
-	doLongGreet(c)
+	// doLongGreet(c)
+	doGreetEveryone(c)
 }
